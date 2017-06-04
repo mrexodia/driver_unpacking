@@ -1,0 +1,6 @@
+.vs/
+*.suo
+*.rar
+Release/
+x64/
+Debug/
