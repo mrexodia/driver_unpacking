@@ -1,6 +1,7 @@
-FAKE(fake1_FAKE)
-FAKE(fake2_FAKE)
-FAKE(fake3_FAKE)
+#define FAKE(x) void* x() { return #x; }
+FAKE(noname1)
+FAKE(noname2)
+FAKE(noname3)
 FAKE(AlpcGetHeaderSize_FAKE)
 FAKE(AlpcGetMessageAttribute_FAKE)
 FAKE(AlpcInitializeMessageAttribute_FAKE)
@@ -2444,3 +2445,20 @@ FAKE(wcsstr_FAKE)
 FAKE(wcstombs_FAKE)
 FAKE(wcstoul_FAKE)
 FAKE(wctomb_FAKE)
+
+#include <windows.h>
+
+#pragma optimize("", off)
+BOOL MmIsAddressValid_FAKE(LPCVOID addr)
+{
+    __try
+    {
+        auto x = *(char*)addr;
+        return TRUE;
+    }
+    __except(EXCEPTION_ACCESS_VIOLATION)
+    {
+        return FALSE;
+    }
+}
+#pragma optimize("", on) 

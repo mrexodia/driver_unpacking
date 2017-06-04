@@ -1,8 +1,8 @@
 LIBRARY "ntoskrnl"
 EXPORTS
-fake1=fake1_FAKE @1 NONAME
-fake2=fake2_FAKE @2 NONAME
-fake3=fake3_FAKE @3 NONAME
+noname1 @1 NONAME
+noname2 @2 NONAME
+noname3 @3 NONAME
 AlpcGetHeaderSize=AlpcGetHeaderSize_FAKE @4
 AlpcGetMessageAttribute=AlpcGetMessageAttribute_FAKE @5
 AlpcInitializeMessageAttribute=AlpcInitializeMessageAttribute_FAKE @6
