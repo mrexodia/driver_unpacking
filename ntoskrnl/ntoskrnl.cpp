@@ -2461,4 +2461,4 @@ BOOL MmIsAddressValid_FAKE(LPCVOID addr)
         return FALSE;
     }
 }
-#pragma optimize("", on) 
+#pragma optimize("", on)
