@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fltmgr", "fltmgr\fltmgr.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ntoskrnl", "ntoskrnl\ntoskrnl.vcxproj", "{29ABF9EB-7559-4280-A7A1-079DA8C9749A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hal", "hal\hal.vcxproj", "{1D58709B-707C-4F06-A70D-8F925B43FD1A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,8 +33,19 @@ Global
 		{29ABF9EB-7559-4280-A7A1-079DA8C9749A}.Release|x64.Build.0 = Release|x64
 		{29ABF9EB-7559-4280-A7A1-079DA8C9749A}.Release|x86.ActiveCfg = Release|Win32
 		{29ABF9EB-7559-4280-A7A1-079DA8C9749A}.Release|x86.Build.0 = Release|Win32
+		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Debug|x64.ActiveCfg = Debug|x64
+		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Debug|x64.Build.0 = Debug|x64
+		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Debug|x86.ActiveCfg = Debug|Win32
+		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Debug|x86.Build.0 = Debug|Win32
+		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Release|x64.ActiveCfg = Release|x64
+		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Release|x64.Build.0 = Release|x64
+		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Release|x86.ActiveCfg = Release|Win32
+		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6C1D3DEF-5CA6-4B25-93E0-7A2E6F63AA90}
 	EndGlobalSection
 EndGlobal

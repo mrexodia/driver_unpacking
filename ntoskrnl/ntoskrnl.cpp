@@ -1,4 +1,10 @@
-#define FAKE(x) void* x() { return #x; }
+#include "../ntdll/ntdll.h"
+#include <windows.h>
+#include <stdint.h>
+
+#include "../utils/debug.h"
+
+#define FAKE(x) void* x() { dtodo(); __debugbreak(); return #x; }
 FAKE(noname1)
 FAKE(noname2)
 FAKE(noname3)
@@ -86,7 +92,6 @@ FAKE(DbgBreakPoint_FAKE)
 FAKE(DbgBreakPointWithStatus_FAKE)
 FAKE(DbgCommandString_FAKE)
 FAKE(DbgLoadImageSymbols_FAKE)
-FAKE(DbgPrint_FAKE)
 FAKE(DbgPrintEx_FAKE)
 FAKE(DbgPrintReturnControlC_FAKE)
 FAKE(DbgPrompt_FAKE)
@@ -141,7 +146,6 @@ FAKE(ExAcquireSpinLockShared_FAKE)
 FAKE(ExAcquireSpinLockSharedAtDpcLevel_FAKE)
 FAKE(ExAllocateCacheAwarePushLock_FAKE)
 FAKE(ExAllocateCacheAwareRundownProtection_FAKE)
-FAKE(ExAllocatePool_FAKE)
 FAKE(ExAllocatePoolWithQuota_FAKE)
 FAKE(ExAllocatePoolWithQuotaTag_FAKE)
 FAKE(ExAllocatePoolWithTag_FAKE)
@@ -174,7 +178,6 @@ FAKE(ExFlushLookasideListEx_FAKE)
 FAKE(ExFreeCacheAwarePushLock_FAKE)
 FAKE(ExFreeCacheAwareRundownProtection_FAKE)
 FAKE(ExFreePool_FAKE)
-FAKE(ExFreePoolWithTag_FAKE)
 FAKE(ExGetCurrentProcessorCounts_FAKE)
 FAKE(ExGetCurrentProcessorCpuUsage_FAKE)
 FAKE(ExGetExclusiveWaiterCount_FAKE)
@@ -1284,7 +1287,6 @@ FAKE(NtQueryInformationTransactionManager_FAKE)
 FAKE(NtQueryQuotaInformationFile_FAKE)
 FAKE(NtQuerySecurityAttributesToken_FAKE)
 FAKE(NtQuerySecurityObject_FAKE)
-FAKE(NtQuerySystemInformation_FAKE)
 FAKE(NtQuerySystemInformationEx_FAKE)
 FAKE(NtQueryVolumeInformationFile_FAKE)
 FAKE(NtReadFile_FAKE)
@@ -2446,11 +2448,23 @@ FAKE(wcstombs_FAKE)
 FAKE(wcstoul_FAKE)
 FAKE(wctomb_FAKE)
 
-#include <windows.h>
+BOOL WINAPI DllMain(
+    _In_ HINSTANCE hinstDLL,
+    _In_ DWORD     fdwReason,
+    _In_ LPVOID    lpvReserved
+)
+{
+    if(fdwReason == DLL_PROCESS_ATTACH)
+        dinit(true);
+    return TRUE;
+}
+
+#define NTKERNELAPI
 
 #pragma optimize("", off)
 BOOL MmIsAddressValid_FAKE(LPCVOID addr)
 {
+    dlogp("%p", addr);
     __try
     {
         auto x = *(char*)addr;
@@ -2462,3 +2476,87 @@ BOOL MmIsAddressValid_FAKE(LPCVOID addr)
     }
 }
 #pragma optimize("", on)
+
+using POOL_TYPE = uint32_t;
+
+NTKERNELAPI PVOID ExAllocatePool_FAKE(
+    POOL_TYPE PoolType,
+    SIZE_T NumberOfBytes
+)
+{
+    dlogp("%u, %p", PoolType, NumberOfBytes);
+    return VirtualAlloc(0, NumberOfBytes, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+}
+
+#include <Psapi.h>
+#pragma comment(lib, "psapi.lib")
+
+extern "C"
+NTSTATUS
+NTAPI
+NtQuerySystemInformation_FAKE(
+    _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    _Out_opt_ PVOID SystemInformation,
+    _In_ ULONG SystemInformationLength,
+    _Out_opt_ PULONG ReturnLength
+)
+{
+    dlogp("%u, %p, %u, %p", SystemInformationClass, SystemInformation, SystemInformationLength, ReturnLength);
+    auto status = NtQuerySystemInformation(SystemInformationClass, SystemInformation, SystemInformationLength, ReturnLength);
+    if(NT_SUCCESS(status) && SystemInformationClass == SystemModuleInformation)
+    {
+        auto modules = PRTL_PROCESS_MODULES(SystemInformation);
+        auto& mod = modules->Modules[0];
+        auto name = (wchar_t*)mod.FullPathName;
+        MODULEINFO info;
+        GetModuleInformation(GetCurrentProcess(), GetModuleHandleA("ntoskrnl.exe"), &info, sizeof(info));
+        mod.ImageBase = info.lpBaseOfDll;
+        mod.ImageSize = info.SizeOfImage;
+        mod.MappedBase = mod.ImageBase;
+
+        /*auto num = modules->NumberOfModules;
+        auto& last = modules->Modules[num - 1];
+        auto path = L"c:\\!exclude\\vmp_driver\\mracdrv.sys";
+        auto filename = wcsrchr(path, '\\');
+        wcscpy_s((wchar_t*)last.FullPathName, _countof(last.FullPathName), path);
+        last.ImageBase = GetModuleHandleW(0);
+        MODULEINFO info;
+        GetModuleInformation(GetCurrentProcess(), (HMODULE)last.ImageBase, &info, sizeof(info));
+        last.ImageSize = info.SizeOfImage;
+        last.MappedBase = last.ImageBase;
+        last.OffsetToFileName = filename + 1 - path;
+        last.Section = (HANDLE)0x1337;*/
+    }
+    return status;
+}
+
+VOID ExFreePoolWithTag_FAKE(
+    PVOID P,
+    ULONG Tag
+)
+{
+    dlogp("%p, %08X", P, Tag);
+    //who cares about leaks amirite?
+}
+
+#include <stdio.h>
+#include <stdarg.h>
+
+ULONG DbgPrint_FAKE(
+    PCSTR Format,
+    ...
+)
+{
+    va_list args;
+
+    va_start(args, Format);
+    
+    auto buffer = new char[16384];
+    auto result = vsnprintf_s(buffer, 16384, _TRUNCATE, Format, args);
+    dlogp("%s", buffer);
+    delete[] buffer;
+
+    va_end(args);
+
+    return result;
+}

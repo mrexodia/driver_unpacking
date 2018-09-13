@@ -1,4 +1,4 @@
-#define FAKE(x) void* x() { return #x; }
+#define FAKE(x) void* x() { __debugbreak(); return #x; }
 FAKE(FltAcknowledgeEcp_FAKE)
 FAKE(FltAcquirePushLockExclusive_FAKE)
 FAKE(FltAcquirePushLockExclusiveEx_FAKE)
