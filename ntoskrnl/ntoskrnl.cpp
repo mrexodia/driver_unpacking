@@ -630,7 +630,6 @@ FAKE(IoAllocateDriverObjectExtension_FAKE)
 FAKE(IoAllocateErrorLogEntry_FAKE)
 FAKE(IoAllocateIrp_FAKE)
 FAKE(IoAllocateIrpEx_FAKE)
-FAKE(IoAllocateMdl_FAKE)
 FAKE(IoAllocateMiniCompletionPacket_FAKE)
 FAKE(IoAllocateSfioStreamIdentifier_FAKE)
 FAKE(IoAllocateWorkItem_FAKE)
@@ -1344,7 +1343,6 @@ FAKE(MmMdlPagesAreZero_FAKE)
 FAKE(MmPageEntireDriver_FAKE)
 FAKE(MmPrefetchPages_FAKE)
 FAKE(MmPrefetchVirtualAddresses_FAKE)
-FAKE(MmProbeAndLockPages_FAKE)
 FAKE(MmProbeAndLockProcessPages_FAKE)
 FAKE(MmProbeAndLockSelectedPages_FAKE)
 FAKE(MmProtectMdlSystemAddress_FAKE)
@@ -2992,7 +2990,7 @@ ULONG DbgPrint_FAKE(
     va_list args;
 
     va_start(args, Format);
-    
+
     auto buffer = new char[16384];
     auto result = vsnprintf_s(buffer, 16384, _TRUNCATE, Format, args);
     dlogp("%s", buffer);
@@ -3001,4 +2999,101 @@ ULONG DbgPrint_FAKE(
     va_end(args);
 
     return result;
+}
+
+using PIRP = void*;
+typedef short CSHORT;
+typedef struct _EPROCESS {} EPROCESS, *PEPROCESS;
+
+typedef
+_Struct_size_bytes_(_Inexpressible_(sizeof(struct _MDL) +    // 747934
+(ByteOffset + ByteCount + PAGE_SIZE - 1) / PAGE_SIZE * sizeof(PFN_NUMBER)))
+struct _MDL
+{
+    struct _MDL *Next;
+    CSHORT Size;
+    CSHORT MdlFlags;
+
+    struct _EPROCESS *Process;
+    PVOID MappedSystemVa;   /* see creators for field size annotations. */
+    PVOID StartVa;   /* see creators for validity; could be address 0.  */
+    ULONG ByteCount;
+    ULONG ByteOffset;
+} MDL, *PMDL;
+
+#define MDL_MAPPED_TO_SYSTEM_VA     0x0001
+#define MDL_PAGES_LOCKED            0x0002
+#define MDL_SOURCE_IS_NONPAGED_POOL 0x0004
+#define MDL_ALLOCATED_FIXED_SIZE    0x0008
+#define MDL_PARTIAL                 0x0010
+#define MDL_PARTIAL_HAS_BEEN_MAPPED 0x0020
+#define MDL_IO_PAGE_READ            0x0040
+#define MDL_WRITE_OPERATION         0x0080
+#define MDL_LOCKED_PAGE_TABLES      0x0100
+#define MDL_PARENT_MAPPED_SYSTEM_VA MDL_LOCKED_PAGE_TABLES
+#define MDL_FREE_EXTRA_PTES         0x0200
+#define MDL_DESCRIBES_AWE           0x0400
+#define MDL_IO_SPACE                0x0800
+#define MDL_NETWORK_HEADER          0x1000
+#define MDL_MAPPING_CAN_FAIL        0x2000
+#define MDL_PAGE_CONTENTS_INVARIANT 0x4000
+#define MDL_ALLOCATED_MUST_SUCCEED  MDL_PAGE_CONTENTS_INVARIANT
+#define MDL_INTERNAL                0x8000
+
+#define MDL_MAPPING_FLAGS (MDL_MAPPED_TO_SYSTEM_VA     | \
+                           MDL_PAGES_LOCKED            | \
+                           MDL_SOURCE_IS_NONPAGED_POOL | \
+                           MDL_PARTIAL_HAS_BEEN_MAPPED | \
+                           MDL_PARENT_MAPPED_SYSTEM_VA | \
+                           MDL_SYSTEM_VA               | \
+                           MDL_IO_SPACE )
+
+extern "C" PMDL IoAllocateMdl_FAKE(
+    PVOID VirtualAddress,
+    ULONG Length,
+    BOOLEAN SecondaryBuffer,
+    BOOLEAN ChargeQuota,
+    PIRP Irp
+)
+{
+    dlogp("0x%p, 0x%x, %d, %d, %p", VirtualAddress, Length, SecondaryBuffer, ChargeQuota, Irp);
+    auto mdl = new MDL();
+    mdl->Next = nullptr;
+    mdl->Size = 1;
+    mdl->MdlFlags = MDL_ALLOCATED_FIXED_SIZE;
+    mdl->Process = (EPROCESS*)0xffffffff00000000;
+    mdl->MappedSystemVa = VirtualAddress;
+    mdl->StartVa = VirtualAddress;
+    mdl->ByteCount = Length;
+    mdl->ByteOffset = 0;
+    return mdl;
+}
+
+extern "C" VOID MmProbeAndLockPages_FAKE(
+    PMDL MemoryDescriptorList,
+    KPROCESSOR_MODE AccessMode,
+    ULONG Operation
+)
+{
+    dlogp("0x%p, %d, %d", MemoryDescriptorList, AccessMode, Operation);
+    if(Operation == 1 /* IoWriteAccess*/)
+    {
+        DWORD oldProtect = 0;
+        if(!VirtualProtect(MemoryDescriptorList->StartVa, MemoryDescriptorList->ByteCount, PAGE_EXECUTE_READWRITE, &oldProtect))
+            dputs("VirtualProtect failed!");
+    }
+    
+}
+
+extern "C" PVOID MmMapLockedPagesSpecifyCache_FAKE(
+    PMDL MemoryDescriptorList,
+    KPROCESSOR_MODE AccessMode,
+    ULONG CacheType,
+    PVOID RequestedAddress,
+    ULONG BugCheckOnFailure,
+    ULONG Priority
+)
+{
+    dlogp("0x%p, %d, %u, 0x%p, %u, %u", MemoryDescriptorList, AccessMode, CacheType, RequestedAddress, BugCheckOnFailure, Priority);
+    return MemoryDescriptorList->StartVa;
 }
