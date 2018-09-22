@@ -713,7 +713,6 @@ FAKE(IoForwardIrpSynchronously_FAKE)
 FAKE(IoFreeController_FAKE)
 FAKE(IoFreeErrorLogEntry_FAKE)
 FAKE(IoFreeIrp_FAKE)
-FAKE(IoFreeMdl_FAKE)
 FAKE(IoFreeMiniCompletionPacket_FAKE)
 FAKE(IoFreeSfioStreamIdentifier_FAKE)
 FAKE(IoFreeWorkItem_FAKE)
@@ -1064,7 +1063,6 @@ FAKE(KeInitializeEvent_FAKE)
 FAKE(KeInitializeGuardedMutex_FAKE)
 FAKE(KeInitializeInterrupt_FAKE)
 FAKE(KeInitializeMutant_FAKE)
-FAKE(KeInitializeMutex_FAKE)
 FAKE(KeInitializeQueue_FAKE)
 FAKE(KeInitializeSecondaryInterruptServices_FAKE)
 FAKE(KeInitializeSemaphore_FAKE)
@@ -1109,7 +1107,6 @@ FAKE(KeQueryActiveGroupCount_FAKE)
 FAKE(KeQueryActiveProcessorAffinity_FAKE)
 FAKE(KeQueryActiveProcessorCount_FAKE)
 FAKE(KeQueryActiveProcessorCountEx_FAKE)
-FAKE(KeQueryActiveProcessors_FAKE)
 FAKE(KeQueryAuxiliaryCounterFrequency_FAKE)
 FAKE(KeQueryDpcWatchdogInformation_FAKE)
 FAKE(KeQueryEffectivePriorityThread_FAKE)
@@ -1175,7 +1172,6 @@ FAKE(KeReportCacheIncoherentDevice_FAKE)
 FAKE(KeResetEvent_FAKE)
 FAKE(KeRestoreExtendedProcessorState_FAKE)
 FAKE(KeRestoreFloatingPointState_FAKE)
-FAKE(KeRevertToUserAffinityThread_FAKE)
 FAKE(KeRevertToUserAffinityThreadEx_FAKE)
 FAKE(KeRevertToUserGroupAffinityThread_FAKE)
 FAKE(KeRundownQueue_FAKE)
@@ -1198,7 +1194,6 @@ FAKE(KeSetLastBranchRecordInUse_FAKE)
 FAKE(KeSetPriorityThread_FAKE)
 FAKE(KeSetProfileIrql_FAKE)
 FAKE(KeSetSelectedCpuSetsThread_FAKE)
-FAKE(KeSetSystemAffinityThread_FAKE)
 FAKE(KeSetSystemAffinityThreadEx_FAKE)
 FAKE(KeSetSystemGroupAffinityThread_FAKE)
 FAKE(KeSetTargetProcessorDpc_FAKE)
@@ -1325,7 +1320,6 @@ FAKE(MmLockPagableSectionByHandle_FAKE)
 FAKE(MmMapIoSpace_FAKE)
 FAKE(MmMapIoSpaceEx_FAKE)
 FAKE(MmMapLockedPages_FAKE)
-FAKE(MmMapLockedPagesSpecifyCache_FAKE)
 FAKE(MmMapLockedPagesWithReservedMapping_FAKE)
 FAKE(MmMapMdl_FAKE)
 FAKE(MmMapMemoryDumpMdl_FAKE)
@@ -1360,7 +1354,6 @@ FAKE(MmSystemRangeStart_FAKE)
 FAKE(MmTrimAllSystemPagableMemory_FAKE)
 FAKE(MmUnloadSystemImage_FAKE)
 FAKE(MmUnlockPagableImageSection_FAKE)
-FAKE(MmUnlockPages_FAKE)
 FAKE(MmUnmapIoSpace_FAKE)
 FAKE(MmUnmapLockedPages_FAKE)
 FAKE(MmUnmapReservedMapping_FAKE)
@@ -2872,6 +2865,9 @@ FAKE(wcstombs_FAKE)
 FAKE(wcstoul_FAKE)
 FAKE(wctomb_FAKE)
 
+#include <stdio.h>
+#include <stdarg.h>
+
 BOOL WINAPI DllMain(
     _In_ HINSTANCE hinstDLL,
     _In_ DWORD     fdwReason,
@@ -2880,6 +2876,7 @@ BOOL WINAPI DllMain(
 {
     if(fdwReason == DLL_PROCESS_ATTACH)
     {
+        //TODO: implement something generic for this
         auto base = (ULONG_PTR)GetModuleHandleW(nullptr);
         DWORD oldProtect = 0;
         VirtualProtect((void*)base, 0x1000, PAGE_READWRITE, &oldProtect);
@@ -2946,26 +2943,20 @@ NtQuerySystemInformation_FAKE(
     if(NT_SUCCESS(status) && SystemInformationClass == SystemModuleInformation)
     {
         auto modules = PRTL_PROCESS_MODULES(SystemInformation);
-        auto& mod = modules->Modules[0];
-        auto name = (wchar_t*)mod.FullPathName;
-        MODULEINFO info;
-        GetModuleInformation(GetCurrentProcess(), GetModuleHandleA("ntoskrnl.exe"), &info, sizeof(info));
-        mod.ImageBase = info.lpBaseOfDll;
-        mod.ImageSize = info.SizeOfImage;
-        mod.MappedBase = mod.ImageBase;
-
-        /*auto num = modules->NumberOfModules;
-        auto& last = modules->Modules[num - 1];
-        auto path = L"c:\\!exclude\\vmp_driver\\mracdrv.sys";
-        auto filename = wcsrchr(path, '\\');
-        wcscpy_s((wchar_t*)last.FullPathName, _countof(last.FullPathName), path);
-        last.ImageBase = GetModuleHandleW(0);
-        MODULEINFO info;
-        GetModuleInformation(GetCurrentProcess(), (HMODULE)last.ImageBase, &info, sizeof(info));
-        last.ImageSize = info.SizeOfImage;
-        last.MappedBase = last.ImageBase;
-        last.OffsetToFileName = filename + 1 - path;
-        last.Section = (HANDLE)0x1337;*/
+        for(ULONG i = 0; i < modules->NumberOfModules; i++)
+        {
+            auto& mod = modules->Modules[i];
+            auto modname = (char*)mod.FullPathName + mod.OffsetToFileName;
+            auto hMod = GetModuleHandleA(modname);
+            if(hMod)
+            {
+                MODULEINFO info;
+                GetModuleInformation(GetCurrentProcess(), hMod, &info, sizeof(info));
+                mod.ImageBase = info.lpBaseOfDll;
+                mod.ImageSize = info.SizeOfImage;
+                mod.MappedBase = mod.ImageBase;
+            }
+        }
     }
     return status;
 }
@@ -2978,9 +2969,6 @@ VOID ExFreePoolWithTag_FAKE(
     dlogp("%p, %08X", P, Tag);
     //who cares about leaks amirite?
 }
-
-#include <stdio.h>
-#include <stdarg.h>
 
 ULONG DbgPrint_FAKE(
     PCSTR Format,
@@ -3019,6 +3007,8 @@ struct _MDL
     PVOID StartVa;   /* see creators for validity; could be address 0.  */
     ULONG ByteCount;
     ULONG ByteOffset;
+    //added for hax
+    DWORD OldProtect;
 } MDL, *PMDL;
 
 #define MDL_MAPPED_TO_SYSTEM_VA     0x0001
@@ -3066,6 +3056,7 @@ extern "C" PMDL IoAllocateMdl_FAKE(
     mdl->StartVa = VirtualAddress;
     mdl->ByteCount = Length;
     mdl->ByteOffset = 0;
+    mdl->OldProtect = 0;
     return mdl;
 }
 
@@ -3079,10 +3070,15 @@ extern "C" VOID MmProbeAndLockPages_FAKE(
     if(Operation == 1 /* IoWriteAccess*/)
     {
         DWORD oldProtect = 0;
-        if(!VirtualProtect(MemoryDescriptorList->StartVa, MemoryDescriptorList->ByteCount, PAGE_EXECUTE_READWRITE, &oldProtect))
+        if(VirtualProtect(MemoryDescriptorList->StartVa, MemoryDescriptorList->ByteCount, PAGE_EXECUTE_READWRITE, &oldProtect))
+        {
+            MemoryDescriptorList->OldProtect = oldProtect;
+        }
+        else
+        {
             dputs("VirtualProtect failed!");
+        }
     }
-    
 }
 
 extern "C" PVOID MmMapLockedPagesSpecifyCache_FAKE(
@@ -3096,4 +3092,53 @@ extern "C" PVOID MmMapLockedPagesSpecifyCache_FAKE(
 {
     dlogp("0x%p, %d, %u, 0x%p, %u, %u", MemoryDescriptorList, AccessMode, CacheType, RequestedAddress, BugCheckOnFailure, Priority);
     return MemoryDescriptorList->StartVa;
+}
+
+extern "C" KAFFINITY KeQueryActiveProcessors_FAKE()
+{
+    dlog();
+    return 1;
+}
+
+extern "C" VOID KeSetSystemAffinityThread_FAKE(
+    KAFFINITY Affinity
+)
+{
+    dlog();
+}
+
+extern "C" VOID KeRevertToUserAffinityThread_FAKE()
+{
+    dlog();
+}
+
+typedef struct _RKMUTEX {} RKMUTEX, *PRKMUTEX;
+
+extern "C" VOID KeInitializeMutex_FAKE(
+    PRKMUTEX Mutex,
+    ULONG    Level
+)
+{
+    dlog();
+}
+
+extern "C" VOID MmUnlockPages_FAKE(
+    PMDL MemoryDescriptorList
+)
+{
+    dlogp("0x%p", MemoryDescriptorList);
+    if(MemoryDescriptorList->OldProtect)
+    {
+        DWORD old = 0;
+        if(!VirtualProtect(MemoryDescriptorList->StartVa, MemoryDescriptorList->ByteCount, MemoryDescriptorList->OldProtect, &old))
+            dputs("VirtualProtect failed!");
+    }
+}
+
+extern "C" VOID IoFreeMdl_FAKE(
+    PMDL Mdl
+)
+{
+    dlogp("0x%p", Mdl);
+    delete Mdl;
 }
