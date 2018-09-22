@@ -2881,7 +2881,23 @@ BOOL WINAPI DllMain(
 )
 {
     if(fdwReason == DLL_PROCESS_ATTACH)
+    {
+        auto base = (ULONG_PTR)GetModuleHandleW(nullptr);
+        DWORD oldProtect = 0;
+        VirtualProtect((void*)base, 0x1000, PAGE_READWRITE, &oldProtect);
+        auto pdh = PIMAGE_DOS_HEADER(base);
+        auto pnth = PIMAGE_NT_HEADERS(base + pdh->e_lfanew);
+        pnth->OptionalHeader.Subsystem = IMAGE_SUBSYSTEM_NATIVE;
+        pnth->OptionalHeader.MajorOperatingSystemVersion = 10;
+        pnth->OptionalHeader.MinorOperatingSystemVersion = 0;
+        pnth->OptionalHeader.MajorImageVersion = 10;
+        pnth->OptionalHeader.MinorImageVersion = 0;
+        pnth->OptionalHeader.MajorSubsystemVersion = 10;
+        pnth->OptionalHeader.MinorSubsystemVersion = 0;
+        pnth->OptionalHeader.DllCharacteristics = 0x1E0;
+        VirtualProtect((void*)base, 0x1000, oldProtect, &oldProtect);
         dinit(true);
+    }
     return TRUE;
 }
 
