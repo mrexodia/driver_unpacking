@@ -1,4 +1,4 @@
-LIBRARY "fltmgr"
+LIBRARY
 EXPORTS
 FltAcknowledgeEcp=FltAcknowledgeEcp_FAKE @1
 FltAcquirePushLockExclusive=FltAcquirePushLockExclusive_FAKE @2

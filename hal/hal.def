@@ -1,4 +1,4 @@
-LIBRARY "hal.dll"
+LIBRARY
 EXPORTS
 HalAcpiGetTableEx=HalAcpiGetTableEx_FAKE @1
 HalAcquireDisplayOwnership=HalAcquireDisplayOwnership_FAKE @2
