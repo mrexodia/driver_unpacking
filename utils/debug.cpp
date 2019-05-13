@@ -15,7 +15,7 @@ void dinit(bool consoleEnabled)
 		AllocConsole();
 	::consoleEnabled = consoleEnabled;
 	InitializeCriticalSection(&cr);
-	hLog = CreateFileW(L"ntoskrnl.log", GENERIC_WRITE, FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	hLog = CreateFileW(L"ntoskrnl.log", GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 }
 
 void dprintf(const char* format, ...)

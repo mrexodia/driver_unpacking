@@ -7,4 +7,6 @@ convert to user mode (cff explorer):
 - optional header -> MajorSubsystemVersion: 5, MinorSubsystemVersion: 2
 - optional header -> DllCharacteristics -> uncheck code integrity image
 
+To defeat memory protection, make sure to change `DllMain`.
+
 See: https://x64dbg.com/blog/2017/06/08/kernel-driver-unpacking.html

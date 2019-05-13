@@ -2882,14 +2882,15 @@ BOOL WINAPI DllMain(
         VirtualProtect((void*)base, 0x1000, PAGE_READWRITE, &oldProtect);
         auto pdh = PIMAGE_DOS_HEADER(base);
         auto pnth = PIMAGE_NT_HEADERS(base + pdh->e_lfanew);
+        __debugbreak(); //TODO: change this to whatever the original .sys used
         pnth->OptionalHeader.Subsystem = IMAGE_SUBSYSTEM_NATIVE;
-        pnth->OptionalHeader.MajorOperatingSystemVersion = 10;
-        pnth->OptionalHeader.MinorOperatingSystemVersion = 0;
-        pnth->OptionalHeader.MajorImageVersion = 10;
+        pnth->OptionalHeader.MajorOperatingSystemVersion = 6;
+        pnth->OptionalHeader.MinorOperatingSystemVersion = 3;
+        pnth->OptionalHeader.MajorImageVersion = 0;
         pnth->OptionalHeader.MinorImageVersion = 0;
-        pnth->OptionalHeader.MajorSubsystemVersion = 10;
+        pnth->OptionalHeader.MajorSubsystemVersion = 6;
         pnth->OptionalHeader.MinorSubsystemVersion = 0;
-        pnth->OptionalHeader.DllCharacteristics = 0x1E0;
+        pnth->OptionalHeader.DllCharacteristics = 0x160;
         VirtualProtect((void*)base, 0x1000, oldProtect, &oldProtect);
         dinit(true);
     }
@@ -2921,8 +2922,9 @@ NTKERNELAPI PVOID ExAllocatePool_FAKE(
     SIZE_T NumberOfBytes
 )
 {
-    dlogp("%u, %p", PoolType, NumberOfBytes);
-    return VirtualAlloc(0, NumberOfBytes, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    auto p = VirtualAlloc(0, NumberOfBytes, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    dlogp("%u, %p -> %p", PoolType, NumberOfBytes, p);
+    return p;
 }
 
 #include <Psapi.h>
