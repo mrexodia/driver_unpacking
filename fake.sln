@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ntoskrnl", "ntoskrnl\ntoskr
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hal", "hal\hal.vcxproj", "{1D58709B-707C-4F06-A70D-8F925B43FD1A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MakeUsermode", "MakeUsermode\MakeUsermode.vcxproj", "{5DFE5858-2BAA-48CB-8DBC-9DA48A9FEB2B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -41,6 +43,14 @@ Global
 		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Release|x64.Build.0 = Release|x64
 		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Release|x86.ActiveCfg = Release|Win32
 		{1D58709B-707C-4F06-A70D-8F925B43FD1A}.Release|x86.Build.0 = Release|Win32
+		{5DFE5858-2BAA-48CB-8DBC-9DA48A9FEB2B}.Debug|x64.ActiveCfg = Debug|x64
+		{5DFE5858-2BAA-48CB-8DBC-9DA48A9FEB2B}.Debug|x64.Build.0 = Debug|x64
+		{5DFE5858-2BAA-48CB-8DBC-9DA48A9FEB2B}.Debug|x86.ActiveCfg = Debug|Win32
+		{5DFE5858-2BAA-48CB-8DBC-9DA48A9FEB2B}.Debug|x86.Build.0 = Debug|Win32
+		{5DFE5858-2BAA-48CB-8DBC-9DA48A9FEB2B}.Release|x64.ActiveCfg = Release|x64
+		{5DFE5858-2BAA-48CB-8DBC-9DA48A9FEB2B}.Release|x64.Build.0 = Release|x64
+		{5DFE5858-2BAA-48CB-8DBC-9DA48A9FEB2B}.Release|x86.ActiveCfg = Release|Win32
+		{5DFE5858-2BAA-48CB-8DBC-9DA48A9FEB2B}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
