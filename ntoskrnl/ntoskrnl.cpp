@@ -2874,25 +2874,66 @@ BOOL WINAPI DllMain(
     _In_ LPVOID    lpvReserved
 )
 {
-    if(fdwReason == DLL_PROCESS_ATTACH)
+    if (fdwReason == DLL_PROCESS_ATTACH)
     {
-        //TODO: implement something generic for this
+        dinit(true);
+
         auto base = (ULONG_PTR)GetModuleHandleW(nullptr);
         DWORD oldProtect = 0;
         VirtualProtect((void*)base, 0x1000, PAGE_READWRITE, &oldProtect);
         auto pdh = PIMAGE_DOS_HEADER(base);
         auto pnth = PIMAGE_NT_HEADERS(base + pdh->e_lfanew);
-        __debugbreak(); //TODO: change this to whatever the original .sys used
-        pnth->OptionalHeader.Subsystem = IMAGE_SUBSYSTEM_NATIVE;
-        pnth->OptionalHeader.MajorOperatingSystemVersion = 6;
-        pnth->OptionalHeader.MinorOperatingSystemVersion = 3;
-        pnth->OptionalHeader.MajorImageVersion = 0;
-        pnth->OptionalHeader.MinorImageVersion = 0;
-        pnth->OptionalHeader.MajorSubsystemVersion = 6;
-        pnth->OptionalHeader.MinorSubsystemVersion = 0;
-        pnth->OptionalHeader.DllCharacteristics = 0x160;
+
+        HANDLE hFile = INVALID_HANDLE_VALUE;
+        {
+            wchar_t szDriverName[MAX_PATH];
+            if (GetModuleFileNameW((HMODULE)base, szDriverName, _countof(szDriverName)))
+            {
+                auto period = wcsrchr(szDriverName, L'.');
+                if (period)
+                {
+                    period[0] = L'\0';
+                    wcscat_s(szDriverName, L".sys");
+                }
+                hFile = CreateFileW(szDriverName, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+            }
+        }
+        bool success = false;
+        if (hFile != INVALID_HANDLE_VALUE)
+        {
+            IMAGE_NT_HEADERS nth;
+            DWORD read = 0;
+            if (SetFilePointer(hFile, pdh->e_lfanew, nullptr, FILE_BEGIN))
+            {
+                if (ReadFile(hFile, &nth, (DWORD)sizeof(nth), &read, nullptr))
+                {
+                    memcpy(pnth, &nth, sizeof(nth));
+                    success = true;
+                }
+            }
+            CloseHandle(hFile);
+        }
+
+        if (success)
+        {
+            dputs("Restored PE header from sys file");
+        }
+        else
+        {
+            dputs("Failed to restore PE header from sys file");
+            //__debugbreak(); //TODO: change this to whatever the original .sys used
+            pnth->OptionalHeader.Subsystem = IMAGE_SUBSYSTEM_NATIVE;
+            pnth->OptionalHeader.MajorOperatingSystemVersion = 10;
+            pnth->OptionalHeader.MinorOperatingSystemVersion = 0;
+            pnth->OptionalHeader.MajorImageVersion = 10;
+            pnth->OptionalHeader.MinorImageVersion = 0;
+            pnth->OptionalHeader.MajorSubsystemVersion = 6;
+            pnth->OptionalHeader.MinorSubsystemVersion = 1;
+            pnth->OptionalHeader.DllCharacteristics = 0x4160;
+            __debugbreak();
+        }
         VirtualProtect((void*)base, 0x1000, oldProtect, &oldProtect);
-        dinit(true);
+        
     }
     return TRUE;
 }

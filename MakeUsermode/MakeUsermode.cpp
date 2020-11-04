@@ -42,7 +42,7 @@ int wmain(int argc, wchar_t* argv[])
 								if (nth.FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64)
 								{
 									nth.OptionalHeader.Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
-									nth.OptionalHeader.DllCharacteristics &= ~IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY;
+									nth.OptionalHeader.DllCharacteristics &= ~(IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY | IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE);
 									if (SetFilePointer(hFile, idh.e_lfanew, nullptr, FILE_BEGIN))
 									{
 										DWORD written = 0;
