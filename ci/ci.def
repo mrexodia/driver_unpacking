@@ -1,0 +1,16 @@
+LIBRARY
+EXPORTS
+noname1 @1 NONAME
+noname2 @2 NONAME
+noname3 @3 NONAME
+CiCheckSignedFile=CiCheckSignedFile_FAKE @4
+CiFindPageHashesInCatalog=CiFindPageHashesInCatalog_FAKE @5
+CiFindPageHashesInSignedFile=CiFindPageHashesInSignedFile_FAKE @6
+CiFreePolicyInfo=CiFreePolicyInfo_FAKE @7
+CiGetCertPublisherName=CiGetCertPublisherName_FAKE @8
+CiGetPEInformation=CiGetPEInformation_FAKE @9
+CiInitialize=CiInitialize_FAKE @10
+CiSetTrustedOriginClaimId=CiSetTrustedOriginClaimId_FAKE @11
+CiValidateFileObject=CiValidateFileObject_FAKE @12
+CiVerifyHashInCatalog=CiVerifyHashInCatalog_FAKE @13
+
