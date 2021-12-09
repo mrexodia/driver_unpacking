@@ -15,23 +15,20 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ntoskrnl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\utils\debug.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="md_assembly.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ntoskrnl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ntoskrnl_fake.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="usermode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\ntdll\ntdll.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="nmd_assembly.h">
       <Filter>Header Files</Filter>
     </ClInclude>

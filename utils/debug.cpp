@@ -52,3 +52,8 @@ size_t unfake(const char* function)
 		return strlen(function) - 5;
 	return strlen(function);
 }
+
+unsigned int pid()
+{
+	return GetCurrentProcessId();
+}
