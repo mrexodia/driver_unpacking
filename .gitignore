@@ -5,3 +5,6 @@ Release/
 x64/
 Debug/
 *.vcxproj.user
+/faker/*.dll
+/faker/*.def
+/faker/*.cpp

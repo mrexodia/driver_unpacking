@@ -15,13 +15,13 @@ namespace faker
                 return;
             }
             var def = new List<string>();
-            def.Add(string.Format("LIBRARY \"{0}\"", args[0]));
+            def.Add("LIBRARY");
             def.Add("EXPORTS");
             var fake = new List<string>();
             fake.Add("#define FAKE(x) void* x() { return #x; }");
             foreach (var line in File.ReadAllLines(args[1]))
             {
-                var split = line.Split(' ');
+                var split = line.Split(' ', '\t');
                 var ord = int.Parse(
                     split[0].TrimStart('0'),
                     NumberStyles.HexNumber);
