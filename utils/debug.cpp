@@ -44,3 +44,11 @@ void dputs(const char* text)
 {
 	dprintf("%s\n", text);
 }
+
+size_t unfake(const char* function)
+{
+	auto fake = strstr(function, "_FAKE");
+	if (fake != nullptr && fake[strlen(fake)] == '\0')
+		return strlen(function) - 5;
+	return strlen(function);
+}
