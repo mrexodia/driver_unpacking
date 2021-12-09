@@ -12,6 +12,7 @@ struct SpecialState
 {
     ULONG_PTR DebugRegisters[16] = {};
     CONTEXT* Context = nullptr;
+    DWORD tid = GetCurrentThreadId();
 
     ULONG_PTR getReg(uint8_t reg)
     {
@@ -87,15 +88,22 @@ struct SpecialState
     }
 };
 
-static thread_local SpecialState special;
+static DWORD tlsIndex = 0;
+
+SpecialState& state()
+{
+    auto ptr = (SpecialState*)TlsGetValue(tlsIndex);
+    if (ptr == nullptr)
+        __debugbreak();
+    return *ptr;
+}
 
 static LONG NTAPI VectoredHandler(
     struct _EXCEPTION_POINTERS* ExceptionInfo
 )
 {
     const auto& exception = *ExceptionInfo->ExceptionRecord;
-    auto& context = *ExceptionInfo->ContextRecord;
-    special.Context = &context;
+    auto context = ExceptionInfo->ContextRecord;
     if (exception.ExceptionCode == DBG_PRINTEXCEPTION_C)
     {
         return EXCEPTION_CONTINUE_SEARCH;
@@ -103,18 +111,20 @@ static LONG NTAPI VectoredHandler(
     else if (exception.ExceptionCode == EXCEPTION_PRIV_INSTRUCTION)
     {
         nmd_x86_instruction instr;
-        if (nmd_x86_decode((const uint8_t*)context.Rip, 15, &instr, NMD_X86_MODE_64, NMD_X86_DECODER_FLAGS_ALL))
+        if (nmd_x86_decode((const uint8_t*)context->Rip, 15, &instr, NMD_X86_MODE_64, NMD_X86_DECODER_FLAGS_ALL))
         {
             char formatted[256];
             auto formatFlags = (NMD_X86_FORMAT_FLAGS_HEX | NMD_X86_FORMAT_FLAGS_0X_PREFIX);
-            nmd_x86_format(&instr, formatted, context.Rip, formatFlags);
-            dlogp("privileged instruction: %s, %d %d", formatted, instr.operands[0].fields.reg, instr.operands[1].fields.reg);
+            nmd_x86_format(&instr, formatted, context->Rip, formatFlags);
+            dlogp("privileged instruction: %s", formatted);
+
+            state().Context = context;
 
             // mov X, Y
             if (instr.id == NMD_X86_INSTRUCTION_MOV && instr.operands[0].type == NMD_X86_OPERAND_TYPE_REGISTER && instr.operands[1].type == NMD_X86_OPERAND_TYPE_REGISTER)
             {
-                special.setReg(instr.operands[0].fields.reg, special.getReg(instr.operands[1].fields.reg));
-                context.Rip += instr.length;
+                state().setReg(instr.operands[0].fields.reg, state().getReg(instr.operands[1].fields.reg));
+                context->Rip += instr.length;
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
         }
@@ -130,6 +140,9 @@ BOOL WINAPI DllMain(
 {
     if (fdwReason == DLL_PROCESS_ATTACH)
     {
+        tlsIndex = TlsAlloc();
+        TlsSetValue(tlsIndex, new SpecialState());
+
         // TODO: hook entry point and set DriverEntry parameters up properly
         dinit(true);
 
@@ -191,6 +204,18 @@ BOOL WINAPI DllMain(
         
         AddVectoredExceptionHandler(1, VectoredHandler);
     }
+    else if (fdwReason == DLL_PROCESS_DETACH)
+    {
+        delete& state();
+    }
+    else if (fdwReason == DLL_THREAD_ATTACH)
+    {
+        TlsSetValue(tlsIndex, new SpecialState());
+    }
+    else if (fdwReason == DLL_THREAD_DETACH)
+    {
+        delete& state();
+    }
     return TRUE;
 }
 
@@ -238,7 +263,6 @@ NTKERNELAPI PVOID ExAllocatePoolWithTag_FAKE(
 #include <Psapi.h>
 #pragma comment(lib, "psapi.lib")
 
-extern "C"
 NTSTATUS
 NTAPI
 NtQuerySystemInformation_FAKE(
@@ -348,7 +372,7 @@ struct _MDL
                            MDL_SYSTEM_VA               | \
                            MDL_IO_SPACE )
 
-extern "C" PMDL IoAllocateMdl_FAKE(
+PMDL IoAllocateMdl_FAKE(
     PVOID VirtualAddress,
     ULONG Length,
     BOOLEAN SecondaryBuffer,
@@ -370,7 +394,7 @@ extern "C" PMDL IoAllocateMdl_FAKE(
     return mdl;
 }
 
-extern "C" VOID MmProbeAndLockPages_FAKE(
+VOID MmProbeAndLockPages_FAKE(
     PMDL MemoryDescriptorList,
     KPROCESSOR_MODE AccessMode,
     ULONG Operation
@@ -391,7 +415,7 @@ extern "C" VOID MmProbeAndLockPages_FAKE(
     }
 }
 
-extern "C" PVOID MmMapLockedPagesSpecifyCache_FAKE(
+PVOID MmMapLockedPagesSpecifyCache_FAKE(
     PMDL MemoryDescriptorList,
     KPROCESSOR_MODE AccessMode,
     ULONG CacheType,
@@ -404,27 +428,27 @@ extern "C" PVOID MmMapLockedPagesSpecifyCache_FAKE(
     return MemoryDescriptorList->StartVa;
 }
 
-extern "C" KAFFINITY KeQueryActiveProcessors_FAKE()
+KAFFINITY KeQueryActiveProcessors_FAKE()
 {
     dlog();
     return 1;
 }
 
-extern "C" VOID KeSetSystemAffinityThread_FAKE(
+VOID KeSetSystemAffinityThread_FAKE(
     KAFFINITY Affinity
 )
 {
     dlog();
 }
 
-extern "C" VOID KeRevertToUserAffinityThread_FAKE()
+VOID KeRevertToUserAffinityThread_FAKE()
 {
     dlog();
 }
 
 typedef struct _RKMUTEX {} RKMUTEX, *PRKMUTEX;
 
-extern "C" VOID KeInitializeMutex_FAKE(
+VOID KeInitializeMutex_FAKE(
     PRKMUTEX Mutex,
     ULONG    Level
 )
@@ -432,7 +456,7 @@ extern "C" VOID KeInitializeMutex_FAKE(
     dlog();
 }
 
-extern "C" void KeInitializeSpinLock_FAKE(
+void KeInitializeSpinLock_FAKE(
     PKSPIN_LOCK SpinLock
 )
 {
@@ -442,7 +466,7 @@ extern "C" void KeInitializeSpinLock_FAKE(
 
 using KIRQL = ULONG;
 
-extern "C" KIRQL KeAcquireSpinLockRaiseToDpc_FAKE(
+KIRQL KeAcquireSpinLockRaiseToDpc_FAKE(
     PKSPIN_LOCK SpinLock
 )
 {
@@ -450,7 +474,7 @@ extern "C" KIRQL KeAcquireSpinLockRaiseToDpc_FAKE(
     return DISPATCH_LEVEL;
 }
 
-extern "C" void KeReleaseSpinLock_FAKE(
+void KeReleaseSpinLock_FAKE(
     PKSPIN_LOCK SpinLock,
     KIRQL NewIrql
 )
@@ -461,7 +485,7 @@ extern "C" void KeReleaseSpinLock_FAKE(
 using PDRIVER_OBJECT = void*;
 using PDEVICE_OBJECT = void*;
 
-extern "C" NTSTATUS IoCreateDevice_FAKE(
+NTSTATUS IoCreateDevice_FAKE(
     PDRIVER_OBJECT  DriverObject,
     ULONG           DeviceExtensionSize,
     PUNICODE_STRING DeviceName,
@@ -486,14 +510,14 @@ NTSTATUS IoCreateSymbolicLink_FAKE(
 
 typedef struct _GUARDED_MUTEX {} GUARDED_MUTEX, * PKGUARDED_MUTEX;
 
-extern "C" void KeInitializeGuardedMutex_FAKE(
+void KeInitializeGuardedMutex_FAKE(
     PKGUARDED_MUTEX Mutex
 )
 {
     dlog();
 }
 
-extern "C" VOID MmUnlockPages_FAKE(
+VOID MmUnlockPages_FAKE(
     PMDL MemoryDescriptorList
 )
 {
@@ -506,7 +530,7 @@ extern "C" VOID MmUnlockPages_FAKE(
     }
 }
 
-extern "C" VOID IoFreeMdl_FAKE(
+VOID IoFreeMdl_FAKE(
     PMDL Mdl
 )
 {
@@ -514,7 +538,7 @@ extern "C" VOID IoFreeMdl_FAKE(
     delete Mdl;
 }
 
-extern "C" NTSTATUS KeGetProcessorNumberFromIndex_FAKE(
+NTSTATUS KeGetProcessorNumberFromIndex_FAKE(
     ULONG             ProcIndex,
     PPROCESSOR_NUMBER ProcNumber
 )
@@ -524,7 +548,7 @@ extern "C" NTSTATUS KeGetProcessorNumberFromIndex_FAKE(
     return STATUS_SUCCESS;
 }
 
-extern "C" void KeSetSystemGroupAffinityThread_FAKE(
+void KeSetSystemGroupAffinityThread_FAKE(
     PGROUP_AFFINITY Affinity,
     PGROUP_AFFINITY PreviousAffinity
 )
@@ -534,9 +558,42 @@ extern "C" void KeSetSystemGroupAffinityThread_FAKE(
         *PreviousAffinity = *Affinity;
 }
 
-extern "C" void KeRevertToUserGroupAffinityThread_FAKE(
+void KeRevertToUserGroupAffinityThread_FAKE(
     PGROUP_AFFINITY PreviousAffinity
 )
 {
     dlogp("Mask: %X, Group: %u", PreviousAffinity->Mask, PreviousAffinity->Group);
+}
+
+using PCREATE_PROCESS_NOTIFY_ROUTINE_EX = void*;
+
+NTSTATUS PsSetCreateProcessNotifyRoutineEx_FAKE(
+    PCREATE_PROCESS_NOTIFY_ROUTINE_EX NotifyRoutine,
+    BOOLEAN                           Remove
+)
+{
+    dlogp("NotifyRoutine: %p, Remove: %d", NotifyRoutine, Remove);
+    return STATUS_SUCCESS;
+}
+
+using POB_CALLBACK_REGISTRATION = void*;
+
+NTSTATUS ObRegisterCallbacks_FAKE(
+    POB_CALLBACK_REGISTRATION CallbackRegistration,
+    PVOID* RegistrationHandle
+)
+{
+    dlogp("CallbackRegistration: %p", CallbackRegistration);
+    *RegistrationHandle = CallbackRegistration;
+    return STATUS_SUCCESS;
+}
+
+using PCREATE_THREAD_NOTIFY_ROUTINE = void*;
+
+NTSTATUS PsSetCreateThreadNotifyRoutine_FAKE(
+    PCREATE_THREAD_NOTIFY_ROUTINE NotifyRoutine
+)
+{
+    dlogp("NotifyRoutine: %p", NotifyRoutine);
+    return STATUS_SUCCESS;
 }
