@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MakeUsermode", "MakeUsermod
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ci", "ci\ci.vcxproj", "{B0B1AC48-D9F6-42C3-BEAD-4594ABBEBAED}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cng", "cng\cng.vcxproj", "{CF57BE4A-6BE1-4473-AE99-9C354FB93227}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -61,6 +63,14 @@ Global
 		{B0B1AC48-D9F6-42C3-BEAD-4594ABBEBAED}.Release|x64.Build.0 = Release|x64
 		{B0B1AC48-D9F6-42C3-BEAD-4594ABBEBAED}.Release|x86.ActiveCfg = Release|Win32
 		{B0B1AC48-D9F6-42C3-BEAD-4594ABBEBAED}.Release|x86.Build.0 = Release|Win32
+		{CF57BE4A-6BE1-4473-AE99-9C354FB93227}.Debug|x64.ActiveCfg = Debug|x64
+		{CF57BE4A-6BE1-4473-AE99-9C354FB93227}.Debug|x64.Build.0 = Debug|x64
+		{CF57BE4A-6BE1-4473-AE99-9C354FB93227}.Debug|x86.ActiveCfg = Debug|Win32
+		{CF57BE4A-6BE1-4473-AE99-9C354FB93227}.Debug|x86.Build.0 = Debug|Win32
+		{CF57BE4A-6BE1-4473-AE99-9C354FB93227}.Release|x64.ActiveCfg = Release|x64
+		{CF57BE4A-6BE1-4473-AE99-9C354FB93227}.Release|x64.Build.0 = Release|x64
+		{CF57BE4A-6BE1-4473-AE99-9C354FB93227}.Release|x86.ActiveCfg = Release|Win32
+		{CF57BE4A-6BE1-4473-AE99-9C354FB93227}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
