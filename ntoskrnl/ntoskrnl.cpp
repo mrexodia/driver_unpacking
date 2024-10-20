@@ -8,6 +8,325 @@
 #include <stdarg.h>
 #include "nmd_assembly.h"
 
+struct _DRIVER_OBJECT;
+typedef struct _DRIVER_OBJECT* PDRIVER_OBJECT;
+
+struct _DEVICE_OBJECT;
+typedef struct _DEVICE_OBJECT* PDEVICE_OBJECT;
+
+typedef NTSTATUS(*PDRIVER_INITIALIZE)(
+    _In_ PDRIVER_OBJECT   DriverObject,
+    _In_ PUNICODE_STRING  RegistryPath
+    );
+
+using PIRP = void*;
+typedef short CSHORT;
+typedef struct _EPROCESS {} EPROCESS, * PEPROCESS;
+
+typedef
+_Struct_size_bytes_(_Inexpressible_(sizeof(struct _MDL) +    // 747934
+    (ByteOffset + ByteCount + PAGE_SIZE - 1) / PAGE_SIZE * sizeof(PFN_NUMBER)))
+    struct _MDL
+{
+    struct _MDL* Next;
+    CSHORT Size;
+    CSHORT MdlFlags;
+
+    struct _EPROCESS* Process;
+    PVOID MappedSystemVa;   /* see creators for field size annotations. */
+    PVOID StartVa;   /* see creators for validity; could be address 0.  */
+    ULONG ByteCount;
+    ULONG ByteOffset;
+    //added for hax
+    DWORD OldProtect;
+} MDL, * PMDL;
+
+#define MDL_MAPPED_TO_SYSTEM_VA     0x0001
+#define MDL_PAGES_LOCKED            0x0002
+#define MDL_SOURCE_IS_NONPAGED_POOL 0x0004
+#define MDL_ALLOCATED_FIXED_SIZE    0x0008
+#define MDL_PARTIAL                 0x0010
+#define MDL_PARTIAL_HAS_BEEN_MAPPED 0x0020
+#define MDL_IO_PAGE_READ            0x0040
+#define MDL_WRITE_OPERATION         0x0080
+#define MDL_LOCKED_PAGE_TABLES      0x0100
+#define MDL_PARENT_MAPPED_SYSTEM_VA MDL_LOCKED_PAGE_TABLES
+#define MDL_FREE_EXTRA_PTES         0x0200
+#define MDL_DESCRIBES_AWE           0x0400
+#define MDL_IO_SPACE                0x0800
+#define MDL_NETWORK_HEADER          0x1000
+#define MDL_MAPPING_CAN_FAIL        0x2000
+#define MDL_PAGE_CONTENTS_INVARIANT 0x4000
+#define MDL_ALLOCATED_MUST_SUCCEED  MDL_PAGE_CONTENTS_INVARIANT
+#define MDL_INTERNAL                0x8000
+
+#define MDL_MAPPING_FLAGS (MDL_MAPPED_TO_SYSTEM_VA     | \
+                           MDL_PAGES_LOCKED            | \
+                           MDL_SOURCE_IS_NONPAGED_POOL | \
+                           MDL_PARTIAL_HAS_BEEN_MAPPED | \
+                           MDL_PARENT_MAPPED_SYSTEM_VA | \
+                           MDL_SYSTEM_VA               | \
+                           MDL_IO_SPACE )
+
+typedef void
+(*PDRIVER_STARTIO) (
+    PDEVICE_OBJECT DeviceObject,
+    PIRP Irp
+    );
+
+typedef void
+(*PDRIVER_UNLOAD) (
+    IN PDRIVER_OBJECT DriverObject
+    );
+
+typedef NTSTATUS
+(*PDRIVER_DISPATCH) (
+    IN PDEVICE_OBJECT DeviceObject,
+    IN PIRP Irp
+    );
+
+typedef struct _DISPATCHER_HEADER
+{
+    union
+    {
+        struct
+        {
+            UCHAR Type;
+            union
+            {
+                UCHAR Abandoned;
+                UCHAR Absolute;
+                UCHAR NpxIrql;
+                UCHAR Signalling;
+            };
+            union
+            {
+                UCHAR Size;
+                UCHAR Hand;
+            };
+            union
+            {
+                UCHAR Inserted;
+                UCHAR DebugActive;
+                UCHAR DpcActive;
+            };
+        };
+        LONG Lock;
+    };
+    LONG SignalState;
+    LIST_ENTRY WaitListHead;
+} DISPATCHER_HEADER, * PDISPATCHER_HEADER;
+
+typedef struct _KEVENT
+{
+    DISPATCHER_HEADER Header;
+} KEVENT, * PKEVENT;
+
+typedef struct _KDEVICE_QUEUE_ENTRY
+{
+    LIST_ENTRY DeviceListEntry;
+    ULONG SortKey;
+    UCHAR Inserted;
+} KDEVICE_QUEUE_ENTRY, * PKDEVICE_QUEUE_ENTRY;
+
+typedef struct _KDEVICE_QUEUE
+{
+    SHORT Type;
+    SHORT Size;
+    LIST_ENTRY DeviceListHead;
+    ULONG Lock;
+    UCHAR Busy;
+} KDEVICE_QUEUE, * PKDEVICE_QUEUE;
+
+typedef struct _IO_TIMER
+{
+    SHORT Type;
+    SHORT TimerFlag;
+    LIST_ENTRY TimerList;
+    PVOID TimerRoutine;
+    PVOID Context;
+    PDEVICE_OBJECT DeviceObject;
+} IO_TIMER, * PIO_TIMER;
+
+typedef struct _VPB
+{
+    SHORT Type;
+    SHORT Size;
+    WORD Flags;
+    WORD VolumeLabelLength;
+    PDEVICE_OBJECT DeviceObject;
+    PDEVICE_OBJECT RealDevice;
+    ULONG SerialNumber;
+    ULONG ReferenceCount;
+    WCHAR VolumeLabel[32];
+} VPB, * PVPB;
+
+typedef struct _KDPC
+{
+    UCHAR Type;
+    UCHAR Importance;
+    WORD Number;
+    LIST_ENTRY DpcListEntry;
+    PVOID DeferredRoutine;
+    PVOID DeferredContext;
+    PVOID SystemArgument1;
+    PVOID SystemArgument2;
+    PVOID DpcData;
+} KDPC, * PKDPC;
+
+typedef enum _IO_ALLOCATION_ACTION {
+    KeepObject,
+    DeallocateObject,
+    DeallocateObjectKeepRegisters
+} IO_ALLOCATION_ACTION, * PIO_ALLOCATION_ACTION;
+
+typedef IO_ALLOCATION_ACTION(NTAPI* PDRIVER_CONTROL)(
+    IN PDEVICE_OBJECT DeviceObject,
+    IN PIRP Irp,
+    IN PVOID MapRegisterBase,
+    IN PVOID Context
+    );
+
+typedef struct _WAIT_CONTEXT_BLOCK {
+    union {
+        KDEVICE_QUEUE_ENTRY WaitQueueEntry;
+        struct {
+            LIST_ENTRY DmaWaitEntry;
+            ULONG      NumberOfChannels;
+            ULONG      SyncCallback : 1;
+            ULONG      DmaContext : 1;
+            ULONG      ZeroMapRegisters : 1;
+            ULONG      Reserved : 9;
+            ULONG      NumberOfRemapPages : 20;
+        };
+    };
+    PDRIVER_CONTROL DeviceRoutine;
+    PVOID           DeviceContext;
+    ULONG           NumberOfMapRegisters;
+    PVOID           DeviceObject;
+    PVOID           CurrentIrp;
+    PKDPC           BufferChainingDpc;
+} WAIT_CONTEXT_BLOCK, * PWAIT_CONTEXT_BLOCK;
+
+#define IRP_MJ_MAXIMUM_FUNCTION 27
+
+typedef struct _IO_CLIENT_EXTENSION* PIO_CLIENT_EXTENSION;
+
+typedef struct _IO_CLIENT_EXTENSION
+{
+    PIO_CLIENT_EXTENSION NextExtension;
+    PVOID ClientIdentificationAddress;
+} IO_CLIENT_EXTENSION, * PIO_CLIENT_EXTENSION;
+
+typedef struct _FS_FILTER_CALLBACKS
+{
+    ULONG SizeOfFsFilterCallbacks;
+    ULONG Reserved;
+    LONG* PreAcquireForSectionSynchronization;
+    PVOID PostAcquireForSectionSynchronization;
+    LONG* PreReleaseForSectionSynchronization;
+    PVOID PostReleaseForSectionSynchronization;
+    LONG* PreAcquireForCcFlush;
+    PVOID PostAcquireForCcFlush;
+    LONG* PreReleaseForCcFlush;
+    PVOID PostReleaseForCcFlush;
+    LONG* PreAcquireForModifiedPageWriter;
+    PVOID PostAcquireForModifiedPageWriter;
+    LONG* PreReleaseForModifiedPageWriter;
+    PVOID PostReleaseForModifiedPageWriter;
+} FS_FILTER_CALLBACKS, * PFS_FILTER_CALLBACKS;
+
+typedef struct _DRIVER_EXTENSION
+{
+    PDRIVER_OBJECT DriverObject;
+    LONG* AddDevice;
+    ULONG Count;
+    UNICODE_STRING ServiceKeyName;
+    PIO_CLIENT_EXTENSION ClientDriverExtension;
+    PFS_FILTER_CALLBACKS FsFilterCallbacks;
+} DRIVER_EXTENSION, * PDRIVER_EXTENSION;
+
+typedef struct _FAST_IO_DISPATCH
+{
+    ULONG SizeOfFastIoDispatch;
+    UCHAR* FastIoCheckIfPossible;
+    UCHAR* FastIoRead;
+    UCHAR* FastIoWrite;
+    UCHAR* FastIoQueryBasicInfo;
+    UCHAR* FastIoQueryStandardInfo;
+    UCHAR* FastIoLock;
+    UCHAR* FastIoUnlockSingle;
+    UCHAR* FastIoUnlockAll;
+    UCHAR* FastIoUnlockAllByKey;
+    UCHAR* FastIoDeviceControl;
+    PVOID AcquireFileForNtCreateSection;
+    PVOID ReleaseFileForNtCreateSection;
+    PVOID FastIoDetachDevice;
+    UCHAR* FastIoQueryNetworkOpenInfo;
+    LONG* AcquireForModWrite;
+    UCHAR* MdlRead;
+    UCHAR* MdlReadComplete;
+    UCHAR* PrepareMdlWrite;
+    UCHAR* MdlWriteComplete;
+    UCHAR* FastIoReadCompressed;
+    UCHAR* FastIoWriteCompressed;
+    UCHAR* MdlReadCompleteCompressed;
+    UCHAR* MdlWriteCompleteCompressed;
+    UCHAR* FastIoQueryOpen;
+    LONG* ReleaseForModWrite;
+    LONG* AcquireForCcFlush;
+    LONG* ReleaseForCcFlush;
+} FAST_IO_DISPATCH, * PFAST_IO_DISPATCH;
+
+typedef struct _DEVICE_OBJECT {
+    CSHORT                   Type;
+    USHORT                   Size;
+    LONG                     ReferenceCount;
+    struct _DRIVER_OBJECT* DriverObject;
+    struct _DEVICE_OBJECT* NextDevice;
+    struct _DEVICE_OBJECT* AttachedDevice;
+    struct _IRP* CurrentIrp;
+    PIO_TIMER                Timer;
+    ULONG                    Flags;
+    ULONG                    Characteristics;
+    __volatile PVPB          Vpb;
+    PVOID                    DeviceExtension;
+    DEVICE_TYPE              DeviceType;
+    CCHAR                    StackSize;
+    union {
+        LIST_ENTRY         ListEntry;
+        WAIT_CONTEXT_BLOCK Wcb;
+    } Queue;
+    ULONG                    AlignmentRequirement;
+    KDEVICE_QUEUE            DeviceQueue;
+    KDPC                     Dpc;
+    ULONG                    ActiveThreadCount;
+    PSECURITY_DESCRIPTOR     SecurityDescriptor;
+    KEVENT                   DeviceLock;
+    USHORT                   SectorSize;
+    USHORT                   Spare1;
+    struct _DEVOBJ_EXTENSION* DeviceObjectExtension;
+    PVOID                    Reserved;
+} DEVICE_OBJECT, * PDEVICE_OBJECT;
+
+typedef struct _DRIVER_OBJECT {
+    CSHORT             Type;
+    CSHORT             Size;
+    PDEVICE_OBJECT     DeviceObject;
+    ULONG              Flags;
+    PVOID              DriverStart;
+    ULONG              DriverSize;
+    PVOID              DriverSection;
+    PDRIVER_EXTENSION  DriverExtension;
+    UNICODE_STRING     DriverName;
+    PUNICODE_STRING    HardwareDatabase;
+    PFAST_IO_DISPATCH  FastIoDispatch;
+    PDRIVER_INITIALIZE DriverInit;
+    PDRIVER_STARTIO    DriverStartIo;
+    PDRIVER_UNLOAD     DriverUnload;
+    PDRIVER_DISPATCH   MajorFunction[IRP_MJ_MAXIMUM_FUNCTION + 1];
+} DRIVER_OBJECT, * PDRIVER_OBJECT;
+
 struct SpecialState
 {
     ULONG_PTR DebugRegisters[16] = {};
@@ -259,6 +578,19 @@ static LONG NTAPI VectoredHandler(
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
+PDRIVER_INITIALIZE original_DriverEntry;
+
+DRIVER_OBJECT g_driverObject = {};
+UNICODE_STRING g_registryPath = {};
+
+extern "C" int hook_EntryPoint(PEB* peb)
+{
+    RtlInitUnicodeString(&g_registryPath, L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\DriverName");
+    auto status = original_DriverEntry((PDRIVER_OBJECT)0x150000000, &g_registryPath);
+    dlogp("DriverEntry -> 0x%08X", status);
+    return status;
+}
+
 BOOL WINAPI DllMain(
     _In_ HINSTANCE hinstDLL,
     _In_ DWORD     fdwReason,
@@ -270,19 +602,42 @@ BOOL WINAPI DllMain(
         tlsIndex = TlsAlloc();
         TlsSetValue(tlsIndex, new SpecialState());
 
-        // TODO: hook entry point and set DriverEntry parameters up properly
         dinit(true);
 
-        auto base = (ULONG_PTR)GetModuleHandleW(nullptr);
+        // Hook the entry point to set up the DriverEntry parameters
+        auto ntdll = GetModuleHandleA("ntdll.dll");
+        auto original_RtlUserThreadStart = (ULONG_PTR)GetProcAddress(ntdll, "RtlUserThreadStart");
+        auto imageBase = (ULONG_PTR)GetModuleHandleA(NULL);
+        auto pdh = (PIMAGE_DOS_HEADER)imageBase;
+        auto pnth = (PIMAGE_NT_HEADERS)(imageBase + pdh->e_lfanew);
+        auto entryPoint = imageBase + pnth->OptionalHeader.AddressOfEntryPoint;
+        auto stackStart = (ULONG_PTR)_AddressOfReturnAddress();
+        auto stackBase = (ULONG_PTR)NtCurrentTeb()->NtTib.StackBase;
+        bool found = false;
+        for (size_t ptr = stackStart; ptr < stackBase - sizeof(CONTEXT); ptr++)
+        {
+            auto ctx = (CONTEXT*)ptr;
+            if (ctx->Rip == original_RtlUserThreadStart && ctx->Rcx == entryPoint)
+            {
+                original_DriverEntry = (PDRIVER_INITIALIZE)entryPoint;
+                ctx->Rcx = (ULONG_PTR)hook_EntryPoint;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            dlogp("Failed to find original DriverEntry: %p", entryPoint);
+            __debugbreak();
+        }
+
         DWORD oldProtect = 0;
-        VirtualProtect((void*)base, 0x1000, PAGE_READWRITE, &oldProtect);
-        auto pdh = PIMAGE_DOS_HEADER(base);
-        auto pnth = PIMAGE_NT_HEADERS(base + pdh->e_lfanew);
+        VirtualProtect((void*)imageBase, 0x1000, PAGE_READWRITE, &oldProtect);
 
         HANDLE hFile = INVALID_HANDLE_VALUE;
         {
             wchar_t szDriverName[MAX_PATH];
-            if (GetModuleFileNameW((HMODULE)base, szDriverName, _countof(szDriverName)))
+            if (GetModuleFileNameW((HMODULE)imageBase, szDriverName, _countof(szDriverName)))
             {
                 auto period = wcsrchr(szDriverName, L'.');
                 if (period)
@@ -327,8 +682,8 @@ BOOL WINAPI DllMain(
             pnth->OptionalHeader.DllCharacteristics = 0x4160;
             __debugbreak();
         }
-        VirtualProtect((void*)base, 0x1000, oldProtect, &oldProtect);
-        
+        VirtualProtect((void*)imageBase, 0x1000, oldProtect, &oldProtect);
+
         AddVectoredExceptionHandler(1, VectoredHandler);
     }
     else if (fdwReason == DLL_PROCESS_DETACH)
@@ -452,55 +807,6 @@ ULONG DbgPrint_FAKE(
     return result;
 }
 
-using PIRP = void*;
-typedef short CSHORT;
-typedef struct _EPROCESS {} EPROCESS, *PEPROCESS;
-
-typedef
-_Struct_size_bytes_(_Inexpressible_(sizeof(struct _MDL) +    // 747934
-(ByteOffset + ByteCount + PAGE_SIZE - 1) / PAGE_SIZE * sizeof(PFN_NUMBER)))
-struct _MDL
-{
-    struct _MDL *Next;
-    CSHORT Size;
-    CSHORT MdlFlags;
-
-    struct _EPROCESS *Process;
-    PVOID MappedSystemVa;   /* see creators for field size annotations. */
-    PVOID StartVa;   /* see creators for validity; could be address 0.  */
-    ULONG ByteCount;
-    ULONG ByteOffset;
-    //added for hax
-    DWORD OldProtect;
-} MDL, *PMDL;
-
-#define MDL_MAPPED_TO_SYSTEM_VA     0x0001
-#define MDL_PAGES_LOCKED            0x0002
-#define MDL_SOURCE_IS_NONPAGED_POOL 0x0004
-#define MDL_ALLOCATED_FIXED_SIZE    0x0008
-#define MDL_PARTIAL                 0x0010
-#define MDL_PARTIAL_HAS_BEEN_MAPPED 0x0020
-#define MDL_IO_PAGE_READ            0x0040
-#define MDL_WRITE_OPERATION         0x0080
-#define MDL_LOCKED_PAGE_TABLES      0x0100
-#define MDL_PARENT_MAPPED_SYSTEM_VA MDL_LOCKED_PAGE_TABLES
-#define MDL_FREE_EXTRA_PTES         0x0200
-#define MDL_DESCRIBES_AWE           0x0400
-#define MDL_IO_SPACE                0x0800
-#define MDL_NETWORK_HEADER          0x1000
-#define MDL_MAPPING_CAN_FAIL        0x2000
-#define MDL_PAGE_CONTENTS_INVARIANT 0x4000
-#define MDL_ALLOCATED_MUST_SUCCEED  MDL_PAGE_CONTENTS_INVARIANT
-#define MDL_INTERNAL                0x8000
-
-#define MDL_MAPPING_FLAGS (MDL_MAPPED_TO_SYSTEM_VA     | \
-                           MDL_PAGES_LOCKED            | \
-                           MDL_SOURCE_IS_NONPAGED_POOL | \
-                           MDL_PARTIAL_HAS_BEEN_MAPPED | \
-                           MDL_PARENT_MAPPED_SYSTEM_VA | \
-                           MDL_SYSTEM_VA               | \
-                           MDL_IO_SPACE )
-
 PMDL IoAllocateMdl_FAKE(
     PVOID VirtualAddress,
     ULONG Length,
@@ -610,9 +916,6 @@ void KeReleaseSpinLock_FAKE(
 {
     dlogp("NewIrql: %u", NewIrql);
 }
-
-using PDRIVER_OBJECT = void*;
-using PDEVICE_OBJECT = void*;
 
 NTSTATUS IoCreateDevice_FAKE(
     PDRIVER_OBJECT  DriverObject,
