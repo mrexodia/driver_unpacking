@@ -651,3 +651,12 @@ NTSTATUS PsSetCreateThreadNotifyRoutine_FAKE(
     dlogp("NotifyRoutine: %p", NotifyRoutine);
     return STATUS_SUCCESS;
 }
+
+void RtlCopyUnicodeString_FAKE(
+    PUNICODE_STRING  DestinationString,
+    PCUNICODE_STRING SourceString
+)
+{
+    dlogp("%wZ -> %wZ", SourceString, DestinationString);
+    RtlCopyUnicodeString(DestinationString, SourceString);
+}
