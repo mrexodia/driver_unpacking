@@ -133,6 +133,26 @@ struct SpecialState
             break;
         }
     }
+
+    ULONG_PTR memAddr(const nmd_x86_operand& op)
+    {
+        if (op.type != NMD_X86_OPERAND_TYPE_MEMORY)
+        {
+            dlogp("Not memory operand!");
+            __debugbreak();
+        }
+        ULONG_PTR addr = 0;
+        if (op.fields.mem.base != NMD_X86_REG_NONE)
+        {
+            addr += getReg(op.fields.mem.base);
+        }
+        if (op.fields.mem.index != NMD_X86_REG_NONE)
+        {
+            addr += getReg(op.fields.mem.index) * op.fields.mem.scale;
+        }
+        addr += op.fields.mem.disp;
+        return addr;
+    }
 };
 
 static DWORD tlsIndex = 0;
@@ -179,6 +199,61 @@ static LONG NTAPI VectoredHandler(
                 Cip(context) += instr.length;
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
+        }
+    }
+    else if (exception.ExceptionCode == EXCEPTION_ACCESS_VIOLATION)
+    {
+        auto addr = exception.ExceptionInformation[1];
+#ifdef _WIN64
+        auto sharedUserDataKernel = 0xFFFFF78000000000;
+#else
+        auto sharedUserDataKernel = 0xFFDF0000;
+#endif // _WIN64
+        auto sharedUserData = 0x7FFE0000;
+        if (addr >= sharedUserDataKernel && addr < sharedUserDataKernel + 0x1000)
+        {
+            nmd_x86_instruction instr;
+            if (nmd_x86_decode((const uint8_t*)Cip(context), 15, &instr, NMD_X86_MODE_64, NMD_X86_DECODER_FLAGS_ALL))
+            {
+                char formatted[256];
+                auto formatFlags = (NMD_X86_FORMAT_FLAGS_HEX | NMD_X86_FORMAT_FLAGS_0X_PREFIX);
+                nmd_x86_format(&instr, formatted, Cip(context), formatFlags);
+                dlogp("access to KUSER_SHARED_DATA: %p %s", Cip(context), formatted);
+
+                state().Context = context;
+
+                // mnem reg, [mem]
+                if (instr.operands[0].type == NMD_X86_OPERAND_TYPE_REGISTER && instr.operands[1].type == NMD_X86_OPERAND_TYPE_MEMORY)
+                {
+                    auto addr = state().memAddr(instr.operands[1]);
+                    addr -= sharedUserDataKernel;
+                    addr += sharedUserData;
+                    ULONG_PTR memvalue = *(ULONG_PTR*)addr;
+                    if (instr.id == NMD_X86_INSTRUCTION_XOR)
+                    {
+                        auto reg = instr.operands[0].fields.reg;
+                        state().setReg(reg, state().getReg(reg) ^ memvalue);
+                        Cip(context) += instr.length;
+                        return EXCEPTION_CONTINUE_EXECUTION;
+                    }
+                    else
+                    {
+                        dlogp("not xor :(");
+                    }
+                }
+                else
+                {
+                    dlogp("unhandled");
+                }
+            }
+            else
+            {
+                dlogp("failed to decode %p", Cip(context));
+            }
+        }
+        else
+        {
+            dlogp("access violation: %p %p", exception.ExceptionAddress, addr);
         }
     }
     return EXCEPTION_CONTINUE_SEARCH;
