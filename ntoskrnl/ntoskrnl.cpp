@@ -295,6 +295,8 @@ NtQuerySystemInformation_FAKE(
     return status;
 }
 
+extern "C" __declspec(dllexport) KSYSTEM_TIME KeTickCount = {};
+
 VOID ExFreePoolWithTag_FAKE(
     PVOID P,
     ULONG Tag

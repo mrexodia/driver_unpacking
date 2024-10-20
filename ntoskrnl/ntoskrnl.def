@@ -2872,4 +2872,4 @@ wcsstr=wcsstr_FAKE @2869
 wcstombs=wcstombs_FAKE @2870
 wcstoul=wcstoul_FAKE @2871
 wctomb=wctomb_FAKE @2872
-
+KeTickCount
