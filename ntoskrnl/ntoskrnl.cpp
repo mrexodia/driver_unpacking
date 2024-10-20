@@ -357,7 +357,7 @@ BOOL MmIsAddressValid_FAKE(LPCVOID addr)
         auto x = *(char*)addr;
         return TRUE;
     }
-    __except(EXCEPTION_ACCESS_VIOLATION)
+    __except (EXCEPTION_ACCESS_VIOLATION)
     {
         return FALSE;
     }
@@ -401,15 +401,15 @@ NtQuerySystemInformation_FAKE(
 {
     dlogp("%u, %p, %u, %p", SystemInformationClass, SystemInformation, SystemInformationLength, ReturnLength);
     auto status = NtQuerySystemInformation(SystemInformationClass, SystemInformation, SystemInformationLength, ReturnLength);
-    if(NT_SUCCESS(status) && SystemInformationClass == SystemModuleInformation)
+    if (NT_SUCCESS(status) && SystemInformationClass == SystemModuleInformation)
     {
         auto modules = PRTL_PROCESS_MODULES(SystemInformation);
-        for(ULONG i = 0; i < modules->NumberOfModules; i++)
+        for (ULONG i = 0; i < modules->NumberOfModules; i++)
         {
             auto& mod = modules->Modules[i];
             auto modname = (char*)mod.FullPathName + mod.OffsetToFileName;
             auto hMod = GetModuleHandleA(modname);
-            if(hMod)
+            if (hMod)
             {
                 MODULEINFO info;
                 GetModuleInformation(GetCurrentProcess(), hMod, &info, sizeof(info));
@@ -530,10 +530,10 @@ VOID MmProbeAndLockPages_FAKE(
 )
 {
     dlogp("0x%p, %d, %d", MemoryDescriptorList, AccessMode, Operation);
-    if(Operation == 1 /* IoWriteAccess*/)
+    if (Operation == 1 /* IoWriteAccess*/)
     {
         DWORD oldProtect = 0;
-        if(VirtualProtect(MemoryDescriptorList->StartVa, MemoryDescriptorList->ByteCount, PAGE_EXECUTE_READWRITE, &oldProtect))
+        if (VirtualProtect(MemoryDescriptorList->StartVa, MemoryDescriptorList->ByteCount, PAGE_EXECUTE_READWRITE, &oldProtect))
         {
             MemoryDescriptorList->OldProtect = oldProtect;
         }
@@ -575,7 +575,7 @@ VOID KeRevertToUserAffinityThread_FAKE()
     dlog();
 }
 
-typedef struct _RKMUTEX {} RKMUTEX, *PRKMUTEX;
+typedef struct _RKMUTEX {} RKMUTEX, * PRKMUTEX;
 
 VOID KeInitializeMutex_FAKE(
     PRKMUTEX Mutex,
@@ -651,10 +651,10 @@ VOID MmUnlockPages_FAKE(
 )
 {
     dlogp("0x%p", MemoryDescriptorList);
-    if(MemoryDescriptorList->OldProtect)
+    if (MemoryDescriptorList->OldProtect)
     {
         DWORD old = 0;
-        if(!VirtualProtect(MemoryDescriptorList->StartVa, MemoryDescriptorList->ByteCount, MemoryDescriptorList->OldProtect, &old))
+        if (!VirtualProtect(MemoryDescriptorList->StartVa, MemoryDescriptorList->ByteCount, MemoryDescriptorList->OldProtect, &old))
             dputs("VirtualProtect failed!");
     }
 }
