@@ -61,6 +61,29 @@ int wmain(int argc, wchar_t* argv[])
 										puts("Failed to set write pointer");
 									}
 								}
+								else if (nth.FileHeader.Machine == IMAGE_FILE_MACHINE_I386)
+								{
+									auto& nth32 = *(IMAGE_NT_HEADERS32*)&nth;
+									nth32.OptionalHeader.Subsystem = IMAGE_SUBSYSTEM_WINDOWS_GUI;
+									nth32.OptionalHeader.DllCharacteristics &= ~(IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY | IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE);
+									if (SetFilePointer(hFile, idh.e_lfanew, nullptr, FILE_BEGIN))
+									{
+										DWORD written = 0;
+										if (WriteFile(hFile, &nth32, sizeof(nth32), &written, nullptr))
+										{
+											status = EXIT_SUCCESS;
+											puts("Yay!");
+										}
+										else
+										{
+											puts("Failed to write file");
+										}
+									}
+									else
+									{
+										puts("Failed to set write pointer");
+									}
+								}
 								else
 								{
 									puts("Invalid machine");

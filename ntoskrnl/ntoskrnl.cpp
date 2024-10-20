@@ -23,14 +23,15 @@ struct SpecialState
 
         switch (reg)
         {
+#ifdef _WIN64
         case NMD_X86_REG_RAX:
             return Context->Rax;
+        case NMD_X86_REG_RBX:
+            return Context->Rbx;
         case NMD_X86_REG_RCX:
             return Context->Rcx;
         case NMD_X86_REG_RDX:
             return Context->Rdx;
-        case NMD_X86_REG_RBX:
-            return Context->Rbx;
         case NMD_X86_REG_RSP:
             return Context->Rsp;
         case NMD_X86_REG_RBP:
@@ -39,11 +40,30 @@ struct SpecialState
             return Context->Rsi;
         case NMD_X86_REG_RDI:
             return Context->Rdi;
+#else
+        case NMD_X86_REG_EAX:
+            return Context->Eax;
+        case NMD_X86_REG_EBX:
+            return Context->Ebx;
+        case NMD_X86_REG_ECX:
+            return Context->Ecx;
+        case NMD_X86_REG_EDX:
+            return Context->Edx;
+        case NMD_X86_REG_ESP:
+            return Context->Esp;
+        case NMD_X86_REG_EBP:
+            return Context->Ebp;
+        case NMD_X86_REG_ESI:
+            return Context->Esi;
+        case NMD_X86_REG_EDI:
+            return Context->Edi;
+#endif // _WIN64
         default:
             dlogp("Unsupported register %u", reg);
             __debugbreak();
             return 0;
         }
+
     }
 
     void setReg(uint8_t reg, ULONG_PTR value)
@@ -56,17 +76,18 @@ struct SpecialState
 
         switch (reg)
         {
+#ifdef _WIN64
         case NMD_X86_REG_RAX:
             Context->Rax = value;
+            break;
+        case NMD_X86_REG_RBX:
+            Context->Rbx = value;
             break;
         case NMD_X86_REG_RCX:
             Context->Rcx = value;
             break;
         case NMD_X86_REG_RDX:
             Context->Rdx = value;
-            break;
-        case NMD_X86_REG_RBX:
-            Context->Rbx = value;
             break;
         case NMD_X86_REG_RSP:
             Context->Rsp = value;
@@ -80,6 +101,32 @@ struct SpecialState
         case NMD_X86_REG_RDI:
             Context->Rdi = value;
             break;
+#else
+        case NMD_X86_REG_EAX:
+            Context->Eax = value;
+            break;
+        case NMD_X86_REG_EBX:
+            Context->Ebx = value;
+            break;
+        case NMD_X86_REG_ECX:
+            Context->Ecx = value;
+            break;
+        case NMD_X86_REG_EDX:
+            Context->Edx = value;
+            break;
+        case NMD_X86_REG_ESP:
+            Context->Esp = value;
+            break;
+        case NMD_X86_REG_EBP:
+            Context->Ebp = value;
+            break;
+        case NMD_X86_REG_ESI:
+            Context->Esi = value;
+            break;
+        case NMD_X86_REG_EDI:
+            Context->Edi = value;
+            break;
+#endif // _WIN64
         default:
             dlogp("Unsupported register %u", reg);
             __debugbreak();
@@ -104,6 +151,11 @@ static LONG NTAPI VectoredHandler(
 {
     const auto& exception = *ExceptionInfo->ExceptionRecord;
     auto context = ExceptionInfo->ContextRecord;
+#ifdef _WIN64
+#define Cip(ctx) ctx->Rip
+#else
+#define Cip(ctx) ctx->Eip
+#endif // _WIN64
     if (exception.ExceptionCode == DBG_PRINTEXCEPTION_C)
     {
         return EXCEPTION_CONTINUE_SEARCH;
@@ -111,11 +163,11 @@ static LONG NTAPI VectoredHandler(
     else if (exception.ExceptionCode == EXCEPTION_PRIV_INSTRUCTION)
     {
         nmd_x86_instruction instr;
-        if (nmd_x86_decode((const uint8_t*)context->Rip, 15, &instr, NMD_X86_MODE_64, NMD_X86_DECODER_FLAGS_ALL))
+        if (nmd_x86_decode((const uint8_t*)Cip(context), 15, &instr, NMD_X86_MODE_64, NMD_X86_DECODER_FLAGS_ALL))
         {
             char formatted[256];
             auto formatFlags = (NMD_X86_FORMAT_FLAGS_HEX | NMD_X86_FORMAT_FLAGS_0X_PREFIX);
-            nmd_x86_format(&instr, formatted, context->Rip, formatFlags);
+            nmd_x86_format(&instr, formatted, Cip(context), formatFlags);
             dlogp("privileged instruction: %s", formatted);
 
             state().Context = context;
@@ -124,7 +176,7 @@ static LONG NTAPI VectoredHandler(
             if (instr.id == NMD_X86_INSTRUCTION_MOV && instr.operands[0].type == NMD_X86_OPERAND_TYPE_REGISTER && instr.operands[1].type == NMD_X86_OPERAND_TYPE_REGISTER)
             {
                 state().setReg(instr.operands[0].fields.reg, state().getReg(instr.operands[1].fields.reg));
-                context->Rip += instr.length;
+                Cip(context) += instr.length;
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
         }
