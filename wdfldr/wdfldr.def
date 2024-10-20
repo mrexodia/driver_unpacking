@@ -1,0 +1,13 @@
+LIBRARY
+EXPORTS
+DllInitialize=DllInitialize_FAKE @1
+DllUnload=DllUnload_FAKE @2
+WdfLdrDiagnosticsValueByNameAsULONG=WdfLdrDiagnosticsValueByNameAsULONG_FAKE @3
+WdfLdrQueryInterface=WdfLdrQueryInterface_FAKE @4
+WdfRegisterClassLibrary=WdfRegisterClassLibrary_FAKE @5
+WdfRegisterLibrary=WdfRegisterLibrary_FAKE @6
+WdfVersionBind=WdfVersionBind_FAKE @7
+WdfVersionBindClass=WdfVersionBindClass_FAKE @8
+WdfVersionUnbind=WdfVersionUnbind_FAKE @9
+WdfVersionUnbindClass=WdfVersionUnbindClass_FAKE @10
+

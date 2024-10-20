@@ -1,0 +1,11 @@
+#define FAKE(x) void* x() { return #x; }
+FAKE(DllInitialize_FAKE)
+FAKE(DllUnload_FAKE)
+FAKE(WdfLdrDiagnosticsValueByNameAsULONG_FAKE)
+FAKE(WdfLdrQueryInterface_FAKE)
+FAKE(WdfRegisterClassLibrary_FAKE)
+FAKE(WdfRegisterLibrary_FAKE)
+FAKE(WdfVersionBind_FAKE)
+FAKE(WdfVersionBindClass_FAKE)
+FAKE(WdfVersionUnbind_FAKE)
+FAKE(WdfVersionUnbindClass_FAKE)
